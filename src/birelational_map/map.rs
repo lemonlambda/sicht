@@ -1,51 +1,33 @@
+use slotmap::{DefaultKey, DenseSlotMap};
+
+use crate::birelational_map::BirelationalId;
+
 use std::{collections::HashMap, hash::Hash};
 
-use slotmap::{DefaultKey, SlotMap};
-
-pub trait BirelationalId {
-    type Id;
-
-    fn get_id(&self) -> Self::Id;
-}
-
-impl BirelationalId for usize {
-    type Id = usize;
-
-    fn get_id(&self) -> Self::Id {
-        *self
-    }
-}
-
-// A <= AID => [B]
-// B <= BID => [A]
-
-// Entity <= EntityId => [Component]
-// Component <= ComponentId => [Entity]
-
-pub struct BirelationalMap<K, V>
+pub struct BirelationalMap<K, KId, V, VId>
 where
-    K: BirelationalId,
-    V: BirelationalId,
-    K::Id: Hash + Eq + PartialEq,
-    V::Id: Hash + Eq + PartialEq,
+    K: BirelationalId<KId>,
+    V: BirelationalId<VId>,
+    KId: Hash + Eq + PartialEq,
+    VId: Hash + Eq + PartialEq,
 {
-    keys: SlotMap<DefaultKey, K>,
-    values: SlotMap<DefaultKey, V>,
-    keys_map: HashMap<K::Id, (DefaultKey, Vec<DefaultKey>)>,
-    values_map: HashMap<V::Id, (DefaultKey, Vec<DefaultKey>)>,
+    keys: DenseSlotMap<DefaultKey, K>,
+    values: DenseSlotMap<DefaultKey, V>,
+    keys_map: HashMap<KId, (DefaultKey, Vec<DefaultKey>)>,
+    values_map: HashMap<VId, (DefaultKey, Vec<DefaultKey>)>,
 }
 
-impl<K, V> BirelationalMap<K, V>
+impl<K, KId, V, VId> BirelationalMap<K, KId, V, VId>
 where
-    K: BirelationalId,
-    V: BirelationalId,
-    K::Id: Hash + Eq + PartialEq,
-    V::Id: Hash + Eq + PartialEq,
+    K: BirelationalId<KId>,
+    V: BirelationalId<VId>,
+    KId: Hash + Eq + PartialEq,
+    VId: Hash + Eq + PartialEq,
 {
     pub fn new() -> Self {
         Self {
-            keys: SlotMap::new(),
-            values: SlotMap::new(),
+            keys: DenseSlotMap::new(),
+            values: DenseSlotMap::new(),
             keys_map: HashMap::new(),
             values_map: HashMap::new(),
         }
@@ -138,12 +120,12 @@ where
     }
 }
 
-impl<K, V> Default for BirelationalMap<K, V>
+impl<K, KId, V, VId> Default for BirelationalMap<K, KId, V, VId>
 where
-    K: BirelationalId,
-    V: BirelationalId,
-    K::Id: Hash + Eq + PartialEq,
-    V::Id: Hash + Eq + PartialEq,
+    K: BirelationalId<KId>,
+    V: BirelationalId<VId>,
+    KId: Hash + Eq + PartialEq,
+    VId: Hash + Eq + PartialEq,
 {
     fn default() -> Self {
         Self::new()
