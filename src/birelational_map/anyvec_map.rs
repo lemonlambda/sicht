@@ -30,12 +30,34 @@ where
         }
     }
 
+    pub fn keys(&self) -> Vec<&'_ K> {
+        self.keys.iter().map(|x| x.1).collect()
+    }
+
+    pub fn values_of<V>(&self) -> Vec<&'_ V>
+    where
+        V: BirelationalId<VId> + 'static,
+    {
+        self.values
+            .iter()
+            .map(|x| x.1)
+            .filter_map(|x| x.downcast_ref::<V>())
+            .collect()
+    }
+
     pub fn get<V>(&mut self, key: K) -> Option<Vec<&'_ V>>
     where
         V: BirelationalId<VId> + 'static,
     {
+        self.get_by_id(key.get_id())
+    }
+
+    pub fn get_by_id<V>(&mut self, key: KId) -> Option<Vec<&'_ V>>
+    where
+        V: BirelationalId<VId> + 'static,
+    {
         self.keys_map
-            .get(&key.get_id())?
+            .get(&key)?
             .1
             .iter()
             .filter_map(|x| self.values.get(*x)?.downcast_ref::<V>())
@@ -43,23 +65,34 @@ where
             .into()
     }
 
-    pub fn get_value<V>(&mut self, value: V) -> Option<Vec<&'_ K>>
+    pub fn get_value_by_id<V>(&mut self, value_id: VId) -> Option<Vec<&'_ K>>
     where
         V: BirelationalId<VId> + 'static,
+        VId: Clone,
         for<'a> &'a V: PartialEq,
     {
         self.values_map
-            .get(&value.get_id())?
+            .get(&value_id)?
             .1
             .iter()
             .filter(|(_, value_idx)| {
                 self.values
                     .get(*value_idx)
-                    .and_then(|value| value.downcast_ref())
-                    == Some(&value)
+                    .and_then(|value| value.downcast_ref::<V>())
+                    .map(|x| x.get_id())
+                    == Some(value_id.clone())
             })
             .map(|(key_idx, _)| self.keys.get(*key_idx))
             .collect()
+    }
+
+    pub fn get_value<V>(&mut self, value: V) -> Option<Vec<&'_ K>>
+    where
+        V: BirelationalId<VId> + 'static,
+        VId: Clone,
+        for<'a> &'a V: PartialEq,
+    {
+        self.get_value_by_id(value.get_id())
     }
 
     pub fn insert_boxed_ref(&mut self, key: &K, value_id: VId, value: Box<dyn Any>) {
