@@ -88,3 +88,50 @@ pub fn different_types_multiple() {
     assert_eq!(*value[0], 20);
     assert_eq!(*value[1], 30);
 }
+
+#[test]
+pub fn mutable_typed_lookup() {
+    let mut map = TestMap::new();
+    map.insert(10usize, 20i32);
+    map.insert(10usize, 30i32);
+    map.insert(10usize, "hello, world");
+
+    let mut values = map.get_by_id_mut::<i32>(10usize).unwrap();
+    *values[0] = 25;
+    *values[1] = 35;
+    drop(values);
+
+    let values = map.get::<i32>(10usize).unwrap();
+    assert_eq!(*values[0], 25);
+    assert_eq!(*values[1], 35);
+
+    let mut strings = map.get_mut::<&str>(10usize).unwrap();
+    *strings[0] = "changed";
+    drop(strings);
+
+    let strings = map.get::<&str>(10usize).unwrap();
+    assert_eq!(*strings[0], "changed");
+}
+
+#[test]
+pub fn mutable_keys_and_values_of() {
+    let mut map = TestMap::new();
+    map.insert(10usize, 20i32);
+    map.insert(11usize, 30i32);
+
+    for value in map.values_of_mut::<i32>() {
+        *value += 1;
+    }
+
+    let values = map.values_of::<i32>();
+    assert_eq!(*values[0], 21);
+    assert_eq!(*values[1], 31);
+
+    for key in map.keys_mut() {
+        *key += 100;
+    }
+
+    let keys = map.keys();
+    assert_eq!(*keys[0], 110);
+    assert_eq!(*keys[1], 111);
+}

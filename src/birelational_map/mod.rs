@@ -1,7 +1,7 @@
 pub mod anyvec_map;
 pub mod map;
 
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 
 pub use map::BirelationalMap;
 

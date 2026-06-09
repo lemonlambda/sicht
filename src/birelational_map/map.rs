@@ -33,22 +33,48 @@ where
         }
     }
 
-    pub fn get(&mut self, key: K) -> Option<Vec<&'_ V>> {
+    pub fn get(&self, key: K) -> Option<Vec<&'_ V>> {
+        self.get_by_id(key.get_id())
+    }
+
+    pub fn get_by_id(&self, key: KId) -> Option<Vec<&'_ V>> {
         self.keys_map
-            .get(&key.get_id())?
+            .get(&key)?
             .1
             .iter()
             .map(|x| self.values.get(*x))
             .collect()
     }
 
-    pub fn get_value(&mut self, value: V) -> Option<Vec<&'_ K>> {
+    pub fn get_mut(&mut self, key: K) -> Option<Vec<&'_ mut V>> {
+        self.get_by_id_mut(key.get_id())
+    }
+
+    pub fn get_by_id_mut(&mut self, key: KId) -> Option<Vec<&'_ mut V>> {
+        let values = self.keys_map.get(&key)?.1.clone();
+        collect_slotmap_mut(&mut self.values, values)
+    }
+
+    pub fn get_value(&self, value: V) -> Option<Vec<&'_ K>> {
+        self.get_value_by_id(value.get_id())
+    }
+
+    pub fn get_value_by_id(&self, value: VId) -> Option<Vec<&'_ K>> {
         self.values_map
-            .get(&value.get_id())?
+            .get(&value)?
             .1
             .iter()
             .map(|x| self.keys.get(*x))
             .collect()
+    }
+
+    pub fn get_value_mut(&mut self, value: V) -> Option<Vec<&'_ mut K>> {
+        self.get_value_by_id_mut(value.get_id())
+    }
+
+    pub fn get_value_by_id_mut(&mut self, value: VId) -> Option<Vec<&'_ mut K>> {
+        let keys = self.values_map.get(&value)?.1.clone();
+        collect_slotmap_mut(&mut self.keys, keys)
     }
 
     pub fn insert(&mut self, key: K, value: V) {
@@ -118,6 +144,29 @@ where
                 .collect();
         }
     }
+}
+
+fn collect_slotmap_mut<T>(
+    slotmap: &mut DenseSlotMap<DefaultKey, T>,
+    keys: Vec<DefaultKey>,
+) -> Option<Vec<&'_ mut T>> {
+    let mut seen = Vec::with_capacity(keys.len());
+    let mut values = Vec::with_capacity(keys.len());
+    let slotmap = slotmap as *mut DenseSlotMap<DefaultKey, T>;
+
+    for key in keys {
+        if seen.contains(&key) {
+            return None;
+        }
+        seen.push(key);
+
+        // The duplicate guard above ensures every returned mutable reference
+        // points at a distinct slot.
+        let value = unsafe { (&mut *slotmap).get_mut(key)? };
+        values.push(value);
+    }
+
+    Some(values)
 }
 
 impl<K, KId, V, VId> Default for BirelationalMap<K, KId, V, VId>

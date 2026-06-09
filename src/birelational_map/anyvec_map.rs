@@ -34,6 +34,10 @@ where
         self.keys.iter().map(|x| x.1).collect()
     }
 
+    pub fn keys_mut(&mut self) -> Vec<&'_ mut K> {
+        self.keys.iter_mut().map(|x| x.1).collect()
+    }
+
     pub fn values_of<V: Any + 'static>(&self) -> Vec<&'_ V> {
         self.values
             .iter()
@@ -42,14 +46,29 @@ where
             .collect()
     }
 
-    pub fn get<V>(&mut self, key: K) -> Option<Vec<&'_ V>>
+    pub fn values_of_mut<V: Any + 'static>(&mut self) -> Vec<&'_ mut V> {
+        self.values
+            .iter_mut()
+            .map(|x| x.1)
+            .filter_map(|x| x.downcast_mut::<V>())
+            .collect()
+    }
+
+    pub fn get<V>(&self, key: K) -> Option<Vec<&'_ V>>
     where
         V: BirelationalId<VId> + 'static,
     {
         self.get_by_id(key.get_id())
     }
 
-    pub fn get_by_id<V>(&mut self, key: KId) -> Option<Vec<&'_ V>>
+    pub fn get_mut<V>(&mut self, key: K) -> Option<Vec<&'_ mut V>>
+    where
+        V: BirelationalId<VId> + 'static,
+    {
+        self.get_by_id_mut(key.get_id())
+    }
+
+    pub fn get_by_id<V>(&self, key: KId) -> Option<Vec<&'_ V>>
     where
         V: BirelationalId<VId> + 'static,
     {
@@ -62,7 +81,33 @@ where
             .into()
     }
 
-    pub fn get_value_by_id<V>(&mut self, value_id: VId) -> Option<Vec<&'_ K>>
+    pub fn get_by_id_mut<V>(&mut self, key: KId) -> Option<Vec<&'_ mut V>>
+    where
+        V: BirelationalId<VId> + 'static,
+    {
+        let values = self.keys_map.get(&key)?.1.clone();
+        let mut seen = Vec::with_capacity(values.len());
+        let mut output = Vec::new();
+        let slotmap = &mut self.values as *mut SlotMap<DefaultKey, Box<dyn Any>>;
+
+        for key in values {
+            if seen.contains(&key) {
+                return None;
+            }
+            seen.push(key);
+
+            // The duplicate guard above ensures every returned mutable
+            // reference points at a distinct slot.
+            let value = unsafe { (&mut *slotmap).get_mut(key)? };
+            if let Some(value) = value.downcast_mut::<V>() {
+                output.push(value);
+            }
+        }
+
+        Some(output)
+    }
+
+    pub fn get_value_by_id<V>(&self, value_id: VId) -> Option<Vec<&'_ K>>
     where
         V: BirelationalId<VId> + 'static,
         VId: Clone,
@@ -83,13 +128,59 @@ where
             .collect()
     }
 
-    pub fn get_value<V>(&mut self, value: V) -> Option<Vec<&'_ K>>
+    pub fn get_value<V>(&self, value: V) -> Option<Vec<&'_ K>>
     where
         V: BirelationalId<VId> + 'static,
         VId: Clone,
         for<'a> &'a V: PartialEq,
     {
         self.get_value_by_id(value.get_id())
+    }
+
+    pub fn get_value_by_id_mut<V>(&mut self, value_id: VId) -> Option<Vec<&'_ mut K>>
+    where
+        V: BirelationalId<VId> + 'static,
+        VId: Clone,
+        for<'a> &'a V: PartialEq,
+    {
+        let relations = self.values_map.get(&value_id)?.1.clone();
+        let mut seen = Vec::with_capacity(relations.len());
+        let mut output = Vec::new();
+        let keys = &mut self.keys as *mut SlotMap<DefaultKey, K>;
+
+        for (key_idx, value_idx) in relations {
+            let matches = self
+                .values
+                .get(value_idx)
+                .and_then(|value| value.downcast_ref::<V>())
+                .map(|value| value.get_id())
+                == Some(value_id.clone());
+
+            if !matches {
+                continue;
+            }
+
+            if seen.contains(&key_idx) {
+                continue;
+            }
+            seen.push(key_idx);
+
+            // The duplicate guard above ensures every returned mutable
+            // reference points at a distinct slot.
+            let key = unsafe { (&mut *keys).get_mut(key_idx)? };
+            output.push(key);
+        }
+
+        Some(output)
+    }
+
+    pub fn get_value_mut<V>(&mut self, value: V) -> Option<Vec<&'_ mut K>>
+    where
+        V: BirelationalId<VId> + 'static,
+        VId: Clone,
+        for<'a> &'a V: PartialEq,
+    {
+        self.get_value_by_id_mut::<V>(value.get_id())
     }
 
     pub fn insert_boxed_ref(&mut self, key: &K, value_id: VId, value: Box<dyn Any>) {
