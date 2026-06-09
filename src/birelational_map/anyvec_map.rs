@@ -34,10 +34,7 @@ where
         self.keys.iter().map(|x| x.1).collect()
     }
 
-    pub fn values_of<V>(&self) -> Vec<&'_ V>
-    where
-        V: BirelationalId<VId> + 'static,
-    {
+    pub fn values_of<V: Any + 'static>(&self) -> Vec<&'_ V> {
         self.values
             .iter()
             .map(|x| x.1)
